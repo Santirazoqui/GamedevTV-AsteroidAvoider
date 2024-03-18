@@ -5,22 +5,89 @@ using UnityEngine.InputSystem;
 
 public class PlayerMovementScript : MonoBehaviour
 {
+    [SerializeField] private float forceMagnitue;
+    [SerializeField] private float maxVelocity;
+    [SerializeField] private float rotationSpeed;
+
+    private Rigidbody rb;
     private Camera mainCamera;
+
+    private Vector3 movementDirection;
 
     void Start()
     {
+        rb = GetComponent<Rigidbody>();
         mainCamera = Camera.main;
     }
 
     void Update()
     {
-        if (!Touchscreen.current.primaryTouch.press.isPressed)
-        {
-            return;
-        }
+        ProcessInput();
 
+        KeepPlayerOnScreen();
+
+        RotateToFaceVelocity();
+    }
+
+    private void ProcessInput()
+    {
         Vector2 touchPosition = Touchscreen.current.primaryTouch.position.ReadValue();
         Vector3 worldPosition = mainCamera.ScreenToWorldPoint(touchPosition);
-        Debug.Log(worldPosition);
+
+        this.movementDirection = worldPosition - transform.position ;
+        movementDirection.z = 0f;
+        movementDirection.Normalize();
+    }
+
+    void FixedUpdate()
+    {
+        if (Touchscreen.current.primaryTouch.press.isPressed)
+        {
+            if (movementDirection == Vector3.zero) { return; }
+
+            rb.AddForce(movementDirection * forceMagnitue * Time.deltaTime, ForceMode.Force);
+            rb.velocity = Vector3.ClampMagnitude(rb.velocity, this.maxVelocity);
+        }
+        else
+        {
+            movementDirection = Vector3.zero;
+        }
+    }
+
+    private void KeepPlayerOnScreen()
+    {
+        Vector3 newPosition = transform.position;
+        Vector3 viewportPosition = mainCamera.WorldToViewportPoint(transform.position);
+        
+        if(viewportPosition.x > 1)
+        {
+            newPosition.x = -newPosition.x + 0.1f;
+        }
+        else if (viewportPosition.x < 0)
+        {
+            newPosition.x = -newPosition.x - 0.1f;
+        }
+
+        if (viewportPosition.y > 1)
+        {
+            newPosition.y = -newPosition.y + 0.1f;
+        }
+        else if (viewportPosition.y < 0)
+        {
+            newPosition.y = -newPosition.y - 0.1f;
+        }
+
+
+        transform.position = newPosition;
+    }
+
+    private void RotateToFaceVelocity()
+    {
+        if(rb.velocity == Vector3.zero) { return; }
+
+        Quaternion targetRotation = Quaternion.LookRotation(rb.velocity, Vector3.back);
+
+        transform.rotation = Quaternion.Lerp(
+            transform.rotation, targetRotation, this.rotationSpeed * Time.deltaTime);
     }
 }
